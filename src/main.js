@@ -7,6 +7,7 @@ import { G, JUMP_V, R, SPEED, advanceTime, cats, mods, setLevel } from './core.j
 import { attachModel, dressCats, resetCat } from './cats.js';
 import { loadCatModel, modelAvailable } from './catModel.js';
 import { MODEL } from './modelConfig.js';
+import { addPhoto, photoURL, takePhoto } from './photos.js';
 import { disposeLevel } from './levels/helpers.js';
 import { ROOMS, updatePush } from './levels/index.js';
 import { buildHome } from './levels/home.js';
@@ -81,7 +82,7 @@ function loadLevel(key) {
   updateCamera(0, true);
 }
 function startRun(order) {
-  run = { order: order || shuffle(Object.keys(ROOMS)).slice(0, 3), idx: 0, yarn: 0, blessings: [] };
+  run = { order: order || shuffle(Object.keys(ROOMS)).slice(0, 3), idx: 0, yarn: 0, blessings: [], photos: [] };
   mods.jump = mods.speed = mods.magnet = mods.yarnMul = 1;
   beginRoom();
 }
@@ -118,7 +119,14 @@ function showBlessing() {
 function finishRun() {
   state = 'nap';
   save.dreams += 1; persist();
-  $('napText').textContent = 'Both cats curled up in the sun. You brought home ' + run.yarn + ' yarn, and the basket at home now holds ' + save.bank + '.';
+  $('napText').textContent = 'Both cats curled up in the sun. You brought home ' + run.yarn + ' yarn, and the jar at home now holds ' + save.bank + '.' + (run.photos.length ? ' Tonight\'s photos are going up on the wall at home.' : '');
+  const strip = $('napStrip'); strip.innerHTML = '';
+  run.photos.forEach((p, i) => {
+    const f = document.createElement('figure'); f.className = 'polaroid'; f.style.setProperty('--tilt', [-4, 2, -1.5, 3][i % 4] + 'deg');
+    f.innerHTML = '<img alt="Photo of both cats in ' + p.room + '" src="' + photoURL(p.src) + '"><figcaption>' + p.room + '</figcaption>';
+    strip.appendChild(f);
+  });
+  strip.hidden = !run.photos.length;
   blip([523, 659, 784, 1046], 0.8, 'triangle', 0.08);
   openMenu(napOverlay, 0);
 }
@@ -228,10 +236,34 @@ function updateWorld(dt) {
   if (state !== 'play') return;
   const both = cats.every(inGoal);
   let obj = level.objective();
-  if (both) obj = 'Stay together...';
+  if (both) obj = level.photo ? 'Lovely!' : 'Say cheese!';
   if (objectiveEl.textContent !== obj) objectiveEl.textContent = obj;
   level.goalT = both ? level.goalT + dt : 0;
-  if (level.goalT > 1.0) { level.goalT = 0; completeRoom(); }
+  // both cats made it: they sit, turn to the camera and get their photo taken
+  posing = both;
+  if (both) cats.forEach(c => { c.facing = Math.PI / 4 + (c.id ? -0.35 : 0.35); });
+  if (both && level.goalT > 0.75 && !level.photo) snapPhoto();
+  if (level.goalT > 1.6) { level.goalT = 0; posing = false; completeRoom(); }
+}
+
+
+// ---------- Dream photos ----------
+let posing = false;
+const flashEl = document.createElement('div'); flashEl.className = 'flash'; document.body.appendChild(flashEl);
+const snapEl = document.createElement('figure'); snapEl.className = 'snap'; snapEl.setAttribute('aria-live', 'polite'); document.body.appendChild(snapEl);
+let snapTimer = 0;
+function snapPhoto() {
+  let src = null;
+  try { src = takePhoto(cats); } catch (e) { console.warn('Could not take the dream photo.', e); }
+  level.photo = true;
+  if (!src) return;
+  const p = addPhoto(src, level.name, save.dreams + 1);
+  if (run) run.photos.push(p);
+  blip([1800, 1200], 0.06, 'square', 0.04); blip([900, 1400], 0.12, 'sine', 0.03);
+  if (!reduceMotion) { flashEl.classList.remove('on'); void flashEl.offsetWidth; flashEl.classList.add('on'); }
+  snapEl.innerHTML = '<img alt="Photo of both cats in ' + level.name + '" src="' + photoURL(src) + '"><figcaption>' + level.name + '</figcaption>';
+  snapEl.classList.add('on'); clearTimeout(snapTimer);
+  snapTimer = setTimeout(() => snapEl.classList.remove('on'), 2600);
 }
 
 
@@ -246,7 +278,7 @@ function animateCat(c, dt) {
   const speed = Math.hypot(c.vel.x, c.vel.z), sMax = SPEED * mods.speed;
   c.walk += speed * dt * 3.4;
   c.squash += (1 - c.squash) * Math.min(1, dt * 10);
-  const forceSit = (state !== 'play' && state !== 'home') || (level && level.curl && level.curl(c)) ? 1 : 0;
+  const forceSit = (state !== 'play' && state !== 'home') || posing || (level && level.curl && level.curl(c)) ? 1 : 0;
   c.sitT += ((c.sitting || forceSit ? 1 : 0) - c.sitT) * Math.min(1, dt * 12);
   const s = c.squash; p.body.scale.set(1 / Math.sqrt(s), s, 1 / Math.sqrt(s));
   const air = !c.grounded;

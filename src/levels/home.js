@@ -5,6 +5,7 @@ import { R, cats, time } from '../core.js';
 import { COATS, HATS, persist, save } from '../save.js';
 import { dressCats, makeHat } from '../cats.js';
 import { blip } from '../audio.js';
+import { allPhotos, photoURL } from '../photos.js';
 // ---------- Home: the cat flat ----------
 // A room you walk around instead of a menu. Step on a coat cushion or a hat mat to try it on,
 // paw to buy it with yarn, and curl up in the big basket together to start a dream.
@@ -81,16 +82,18 @@ function buildHome() {
   }
   const jarTag = addTag(8.5, 2.1, 10.0);
 
-  // ---- memory wall: a framed picture for every dream you've finished together ----
-  const frameCols = ['#f29aa8', '#7fc8f8', '#ffd98a', '#a7d7a0', '#c7b3f0', '#f6b48f', '#9fd8d0', '#f3e3cc'];
-  for (let i = 0; i < Math.min(save.dreams, 8); i++) {
-    const x = 1.6 + (i % 4) * 0.95, y = 2.0 + Math.floor(i / 4) * 0.85;
-    addBox(L, x - 0.36, y - 0.3, -0.06, x + 0.36, y + 0.3, 0.05, M.wood, { solid: false, cast: false });
-    addBox(L, x - 0.28, y - 0.22, -0.05, x + 0.28, y + 0.22, 0.07, mat(frameCols[i]), { solid: false, cast: false });
-    addMesh(L, new THREE.SphereGeometry(0.07, 8, 6), mat('#e8955a'), x - 0.08, y - 0.1, 0.09, false);
-    addMesh(L, new THREE.SphereGeometry(0.07, 8, 6), mat('#8b93a6'), x + 0.08, y - 0.1, 0.09, false);
-  }
-  if (save.dreams > 0) addTag(3.0, 3.4, 0.1).el.innerHTML = save.dreams === 1 ? '1 dream together' : save.dreams + ' dreams together';
+  // ---- memory wall: your newest dream photos, a little gallery between the window and the armchair ----
+  const wallPhotos = allPhotos().slice(-6);
+  const loader = new THREE.TextureLoader();
+  wallPhotos.forEach((p, i) => {
+    const x = 12.25 + (i % 3) * 0.98, y = 2.4 - Math.floor(i / 3) * 0.86 + (i % 2) * 0.05, tilt = [0.04, -0.03, 0.02, -0.05][i % 4];
+    const frame = addBox(L, x - 0.45, y - 0.36, -0.06, x + 0.45, y + 0.36, 0.05, M.wood, { solid: false, cast: false }).mesh;
+    frame.rotation.z = tilt;
+    const tex = loader.load(photoURL(p.src)); tex.encoding = THREE.sRGBEncoding;
+    const pic = addMesh(L, new THREE.PlaneGeometry(0.8, 0.6), new THREE.MeshBasicMaterial({ map: tex }), x, y, 0.065, false);
+    pic.rotation.z = tilt;
+  });
+  if (save.dreams > 0) addTag(wallPhotos.length ? 13.2 : 10.5, 3.05, 0.1).el.innerHTML = save.dreams === 1 ? '1 dream together' : save.dreams + ' dreams together';
 
   // ---- behaviour ----
   const standing = c => c.grounded && c.pos.y < 0.2;

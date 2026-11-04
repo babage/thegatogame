@@ -1,0 +1,76 @@
+import { createRequire } from 'module'; const require = createRequire(import.meta.url); const { chromium } = require('playwright');
+import path from 'path';
+const URL_ = process.argv[2]; const dir = process.argv[5] || '/tmp';
+(async () => {
+  const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
+  const page = await browser.newPage({ viewport: { width: 640, height: 400 } });
+  const errors = [];
+  page.on('console', m => { if (m.type() === 'error' && !m.text().includes('ERR_FAILED')) errors.push(m.text()); });
+  page.on('pageerror', e => errors.push('PAGEERROR ' + e.message));
+  await page.route('**/*', r => { const u = r.request().url(); if (u.startsWith(URL_)) return r.continue(); return r.abort(); });
+  await page.goto(URL_);
+  await page.waitForTimeout(800);
+  const G = fn => page.evaluate(fn);
+  const waitFor = async (fn, ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await page.evaluate(fn)) return true; await page.waitForTimeout(100); } return false; };
+  const hold = async (keys, ms) => { for (const k of keys) await page.keyboard.down(k); await page.waitForTimeout(ms); for (const k of keys) await page.keyboard.up(k); };
+  await page.keyboard.press('KeyX');
+  console.log('hub buttons', (await G(() => window.__gato.menuButtons())).slice(-3));
+  await G(() => window.__gato.startRun(['garden', 'attic', 'living']));
+  console.log('level', await G(() => window.__gato.level.key));
+  // GARDEN: splash
+  await G(() => { const b = window.__gato.cats[1]; b.pos.x = 8.6; b.pos.y = 0.5; b.pos.z = 8; });
+  await page.waitForTimeout(600);
+  console.log('after splash cat1', JSON.stringify(await G(() => window.__gato.cats[1].pos)));
+  console.log('stones visible before moon', await G(() => window.__gato.level.group.children.filter(m => m.geometry && m.geometry.type === 'CylinderGeometry' && m.position.y === 0.15).map(m => m.visible).join(',')));
+  await G(() => { const a = window.__gato.cats[0]; a.pos.x = 4.4; a.pos.y = 0; a.pos.z = 3.0; });
+  await page.waitForTimeout(800);
+  console.log('stones visible on moon', await G(() => window.__gato.level.group.children.filter(m => m.geometry && m.geometry.type === 'CylinderGeometry' && m.position.y === 0.15).map(m => m.visible).join(',')));
+  console.log('objective', await G(() => document.getElementById('objective').textContent));
+  await G(() => { const b = window.__gato.cats[1]; b.pos.x = 9.6; b.pos.y = 1.0; b.pos.z = 3.3; });
+  await page.waitForTimeout(500);
+  console.log('cat1 on stone', JSON.stringify(await G(() => window.__gato.cats[1].pos)));
+  await page.screenshot({ path: path.join(dir, 's_garden.png') });
+  // cuddle test
+  await G(() => { const [a, b] = window.__gato.cats; a.pos.x = 3; a.pos.z = 8; a.pos.y = 0; b.pos.x = 3.8; b.pos.z = 8; b.pos.y = 0; });
+  await page.keyboard.down('ShiftLeft'); await page.keyboard.down('ShiftRight');
+  await page.waitForTimeout(2200);
+  console.log('hearts', await G(() => Array.from(document.querySelectorAll('.bubble')).map(b => b.textContent).join('')));
+  await page.screenshot({ path: path.join(dir, 's_cuddle.png') });
+  await page.keyboard.up('ShiftLeft'); await page.keyboard.up('ShiftRight');
+  // pause
+  await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+  console.log('paused', await G(() => window.__gato.state));
+  await page.screenshot({ path: path.join(dir, 's_pause.png') });
+  await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+  console.log('resumed', await G(() => window.__gato.state));
+  await page.keyboard.press('KeyM'); await page.waitForTimeout(100);
+  console.log('music on?', await G(() => window.__gato.music.on));
+  await G(() => { const [a, b] = window.__gato.cats; a.pos.x = 18.5; a.pos.y = 0; a.pos.z = 1.4; b.pos.x = 20.4; b.pos.y = 0; b.pos.z = 1.5; });
+  console.log('garden done', await waitFor(() => window.__gato.state === 'blessing', 15000));
+  await page.keyboard.press('Enter'); await page.waitForTimeout(400);
+  console.log('level', await G(() => window.__gato.level.key + ' ' + JSON.stringify(window.__gato.mods)));
+  await G(() => { Object.assign(window.__gato.mods, { speed: 1, jump: 1 }); });
+  // ATTIC: one cat push
+  await G(() => { const [a, b] = window.__gato.cats; a.pos.x = 3.1; a.pos.z = 8.1; a.pos.y = 0; b.pos.x = 1.5; b.pos.z = 11; b.pos.y = 0; });
+  await hold(['KeyD', 'KeyS'], 1500);
+  console.log('solo push trunk', JSON.stringify(await G(() => ({ x: window.__gato.level.trunk.x, z: window.__gato.level.trunk.z }))), await G(() => document.getElementById('objective').textContent));
+  await G(() => { const [a, b] = window.__gato.cats; a.pos.x = 3.1; a.pos.z = 8.1; b.pos.x = 3.1; b.pos.z = 8.9; b.pos.y = 0; });
+  await hold(['KeyD', 'KeyS', 'ArrowRight', 'ArrowDown'], 7000);
+  console.log('duo push +x trunk', JSON.stringify(await G(() => ({ x: window.__gato.level.trunk.x, z: window.__gato.level.trunk.z }))));
+  await G(() => { const g = window.__gato, t = g.level.trunk; const [a, b] = g.cats; a.pos.x = t.x - 0.35; a.pos.z = t.z + 1.2; a.pos.y = 0; b.pos.x = t.x + 0.35; b.pos.z = t.z + 1.2; b.pos.y = 0; });
+  await hold(['KeyW', 'KeyD', 'ArrowUp', 'ArrowRight'], 5000);
+  console.log('duo push -z trunk', JSON.stringify(await G(() => ({ x: window.__gato.level.trunk.x, z: window.__gato.level.trunk.z }))), await G(() => document.getElementById('objective').textContent));
+  await page.screenshot({ path: path.join(dir, 's_attic.png') });
+  // climb: put cat0 on the trunk, jump toward loft (-z = W+D)
+  await G(() => { const g = window.__gato, t = g.level.trunk, a = g.cats[0]; a.pos.x = t.x; a.pos.z = t.z + 0.2; a.pos.y = 0.95; a.vel.y = 0; });
+  await page.waitForTimeout(300);
+  await page.keyboard.down('KeyW'); await page.keyboard.down('KeyD'); await page.keyboard.down('Space');
+  await page.waitForTimeout(700);
+  await page.keyboard.up('Space'); await page.keyboard.up('KeyW'); await page.keyboard.up('KeyD');
+  await page.waitForTimeout(400);
+  console.log('cat0 after climb (y 1.9?)', JSON.stringify(await G(() => window.__gato.cats[0].pos)));
+  await G(() => { const [a, b] = window.__gato.cats; a.pos.x = 14.5; a.pos.y = 1.9; a.pos.z = 1.2; b.pos.x = 16.4; b.pos.y = 1.9; b.pos.z = 1.6; });
+  console.log('attic done', await waitFor(() => window.__gato.state === 'blessing', 15000));
+  console.log('errors', JSON.stringify(errors));
+  await browser.close();
+})();

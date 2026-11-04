@@ -275,7 +275,7 @@ function animateCat(c, dt) {
   c.sitT += ((c.sitting || forceSit ? 1 : 0) - c.sitT) * Math.min(1, dt * 12);
   const s = c.squash; p.body.scale.set(1 / Math.sqrt(s), s, 1 / Math.sqrt(s));
   const air = !c.grounded;
-  if (c.model) c.model.update({ speed, maxSpeed: sMax, air, vy: c.vel.y, sitT: c.sitT, squash: s, dt, time });
+  if (c.model) c.model.update({ speed, maxSpeed: sMax, air, vy: c.vel.y, sitT: c.sitT, squash: s, pawT: c.pawT, meowT: c.meowT, dt, time });
   const swing = air ? 0 : Math.sin(c.walk) * 0.7 * Math.min(1, speed / sMax);
   p.legs[0].rotation.x = air ? -0.7 : swing; p.legs[3].rotation.x = air ? 0.7 : swing;
   p.legs[1].rotation.x = air ? -0.7 : -swing; p.legs[2].rotation.x = air ? 0.7 : -swing;

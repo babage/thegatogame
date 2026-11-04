@@ -16,7 +16,8 @@ if (standIn) {
   execFileSync('node', ['tools/make-test-cat.mjs', glb]);
 }
 
-const server = spawn('npx', ['vite', 'preview', '--port', String(port), '--strictPort'], { stdio: 'ignore' });
+// Detached so the whole process group (npx and the vite it starts) can be stopped at the end.
+const server = spawn('npx', ['vite', 'preview', '--port', String(port), '--strictPort'], { stdio: 'ignore', detached: true });
 await new Promise(r => setTimeout(r, 2500));
 const env = { ...process.env, NODE_PATH: execFileSync('npm', ['root', '-g']).toString().trim() };
 
@@ -38,7 +39,7 @@ await test('full-run.mjs', '', '', '/tmp');
 await test('garden-attic.mjs', '', '', '/tmp');
 await test('model.mjs');
 
-server.kill();
+process.kill(-server.pid);
 if (standIn) fs.rmSync(glb);
 console.log(failed ? '\nSOME TESTS FAILED' : '\nALL TESTS PASSED');
 process.exit(failed ? 1 : 0);

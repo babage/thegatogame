@@ -28,5 +28,49 @@ export const MODEL = {
     axis: 'x',
     swing: 0.55,
     legs: {}
+  },
+  // Poses blended in from code, as [x, y, z] turns in radians on each bone's own axes.
+  // On this rig, legs swing forward on +x, the root tips nose-down on +z, the neck and head
+  // tip nose-down on +x, and the tail sways on x and lifts on +z. `lift` lowers the body, in the model's own units.
+  poses: {
+    sit: {
+      lift: -0.125,
+      bones: {
+        Wolf_ROOTSHJnt_38: [0, 0, -0.45],
+        Wolf_Neck_01SHJnt_16: [0.35, 0, 0],
+        Wolf_l_FrontLeg_HipSHJnt_4: [-0.45, 0, 0],
+        Wolf_r_FrontLeg_HipSHJnt_10: [-0.45, 0, 0],
+        Wolf_l_HindLeg_HipSHJnt_27: [1.2, 0, 0],
+        Wolf_r_HindLeg_HipSHJnt_33: [1.2, 0, 0],
+        Wolf_l_HindLeg_Knee1SHJnt_26: [-1.5, 0, 0],
+        Wolf_r_HindLeg_Knee1SHJnt_32: [-1.5, 0, 0],
+        Wolf_l_HindLeg_Knee2SHJnt_25: [0.7, 0, 0],
+        Wolf_r_HindLeg_Knee2SHJnt_31: [0.7, 0, 0],
+        Wolf_Tail_01_02SHJnt_37: [0.5, 0, 0.5],
+        Wolf_Tail_01_03SHJnt_36: [0.5, 0, 0.4]
+      }
+    },
+    // A batting swipe with the right front paw.
+    paw: {
+      bones: {
+        Wolf_ROOTSHJnt_38: [0, 0, -0.12],
+        Wolf_r_FrontLeg_HipSHJnt_10: [2.2, 0, 0],
+        Wolf_r_FrontLeg_KneeSHJnt_9: [-0.2, 0, 0],
+        Wolf_Head_JawSHJnt_12: [0.2, 0, 0]
+      }
+    },
+    // This rig has no working jaw, so a meow lifts the head instead.
+    meow: {
+      bones: {
+        Wolf_Neck_01SHJnt_16: [-0.3, 0, 0],
+        Wolf_Head_JawSHJnt_12: [-0.35, 0, 0]
+      }
+    }
+  },
+  // Tail bones from base to tip, swishing about `axis` by up to `sway` radians each.
+  tail: {
+    axis: 'x',
+    sway: 0.22,
+    bones: ['Wolf_Tail_01_02SHJnt_37', 'Wolf_Tail_01_03SHJnt_36', 'Wolf_Tail_01_04SHJnt_35', 'Wolf_Tail_01_05SHJnt_34']
   }
 };

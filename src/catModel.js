@@ -198,14 +198,41 @@ export function createModelRig(gltf, { length = 0.95 } = {}) {
   };
   if (mixer) play('idle', 0);
 
+  // Bone layer: code-driven rotations added on top of whatever the clips do each frame.
+  // Each entry is an [x, y, z] angle offset in the bone's own space, summed from every source.
+  const AXES = { x: 0, y: 1, z: 2 };
+  const touched = new Map();
+  const boneSlot = bone => {
+    if (!touched.has(bone)) touched.set(bone, { bone, sum: [0, 0, 0], undo: new THREE.Quaternion() });
+    return touched.get(bone);
+  };
+  const addTurn = (slot, v, w) => { for (let i = 0; i < 3; i++) slot.sum[i] += v[i] * w; };
+  const named = n => {
+    const b = model.getObjectByName(n);
+    if (!b) console.warn('Cat model: no bone named', n);
+    return b;
+  };
+
   // Procedural legs, only when the model has no walk clip of its own.
   const legs = clips.walk ? [] : findLegs(model);
-  const axis = new THREE.Vector3(...['x', 'y', 'z'].map(a => (a === ((MODEL.gait && MODEL.gait.axis) || 'x') ? 1 : 0)));
+  const swingAxis = AXES[(MODEL.gait && MODEL.gait.axis) || 'x'];
   const swing = (MODEL.gait && MODEL.gait.swing) || 0.55;
-  legs.forEach(l => { l.offset = new THREE.Quaternion(); l.undo = new THREE.Quaternion(); });
-  let stride = 0, airPose = 0;
+  legs.forEach(l => { l.slot = boneSlot(l.bone); });
   const legsWalk = legs.length > 0;
 
+  // Poses blended in by game state: sit, paw and meow. `lift` (model units) lowers the body.
+  const poses = {};
+  for (const [key, def] of Object.entries(MODEL.poses || {})) {
+    const bones = Object.entries(def.bones || {}).map(([n, v]) => ({ bone: named(n), v })).filter(e => e.bone);
+    bones.forEach(e => { e.slot = boneSlot(e.bone); });
+    poses[key] = { bones, lift: (def.lift || 0) * scale };
+  }
+  const tailCfg = MODEL.tail || {};
+  const tail = (tailCfg.bones || []).map(named).filter(Boolean).map(b => boneSlot(b));
+  const tailAxis = AXES[tailCfg.axis || 'x'];
+  const sitPose = !!poses.sit && !actions.sit;
+
+  let stride = 0, airPose = 0, pawW = 0, meowW = 0;
   let bob = 0;
   return {
     object: holder,
@@ -213,6 +240,7 @@ export function createModelRig(gltf, { length = 0.95 } = {}) {
     animated,
     clipNames: (gltf.animations || []).map(a => a.name),
     legsWalk,
+    poses: Object.keys(poses),
     // Changes the fur to a coat colour. The model's own coat keeps the texture as it is.
     // Textures with `coatSwap` set are recoloured; anything else is tinted.
     setCoat(hex, id) {
@@ -228,11 +256,11 @@ export function createModelRig(gltf, { length = 0.95 } = {}) {
         }
       });
     },
-    // state: { speed, maxSpeed, air, vy, sitT, squash, pawT, dt, time }
+    // state: { speed, maxSpeed, air, vy, sitT, squash, pawT, meowT, dt, time }
     update(st) {
       const k = Math.min(1, st.speed / st.maxSpeed);
-      // Take last frame's leg swing back off, so it never piles up on bones the clip does not drive.
-      legs.forEach(l => l.bone.quaternion.multiply(l.undo));
+      // Take last frame's offsets back off, so they never pile up on bones the clip does not drive.
+      touched.forEach(t => t.bone.quaternion.multiply(t.undo));
       if (mixer) {
         if (st.air && actions.jump) play('jump', 0.1);
         else if (st.sitT > 0.5 && actions.sit) play('sit', 0.25);
@@ -247,20 +275,44 @@ export function createModelRig(gltf, { length = 0.95 } = {}) {
       const ease = Math.min(1, st.dt * 10);
       stride += ((st.air ? 0 : k) * (1 - st.sitT) - stride) * ease;
       airPose += ((st.air ? 1 : 0) - airPose) * ease;
+      // Paw and meow rise and fall over their timers (0.32 s and 0.5 s in the game).
+      pawW = st.pawT > 0 ? Math.sin(Math.min(1, st.pawT / 0.32) * Math.PI) : 0;
+      meowW = st.meowT > 0 ? Math.sin(Math.min(1, st.meowT / 0.5) * Math.PI) : 0;
+
+      touched.forEach(t => { t.sum[0] = t.sum[1] = t.sum[2] = 0; });
       legs.forEach(l => {
         // Swing while walking; in the air the front paws reach forward and the back legs stretch out.
-        const a = swing * stride * Math.sin(bob + l.phase) + airPose * (l.front ? 0.5 : -0.45);
-        l.offset.setFromAxisAngle(axis, a);
-        l.undo.copy(l.offset).invert();
-        l.bone.quaternion.multiply(l.offset);
+        const v = [0, 0, 0];
+        v[swingAxis] = swing * stride * Math.sin(bob + l.phase) + airPose * (l.front ? 0.5 : -0.45);
+        addTurn(l.slot, v, 1);
       });
+      const weights = { sit: sitPose ? st.sitT : 0, paw: pawW, meow: meowW };
+      for (const [key, w] of Object.entries(weights)) {
+        if (poses[key] && w > 0.001) poses[key].bones.forEach(e => addTurn(e.slot, e.v, w));
+      }
+      // Tail: a slow lazy swish at rest, quicker and wider on the move, each segment a little behind.
+      const swish = (tailCfg.sway || 0.2) * (0.6 + 0.8 * stride);
+      tail.forEach((slot, i) => {
+        const v = [0, 0, 0];
+        v[tailAxis] = swish * Math.sin(st.time * (1.6 + 2.4 * stride) - i * 0.7);
+        addTurn(slot, v, 1);
+      });
+      const e = new THREE.Euler();
+      touched.forEach(t => {
+        const q = new THREE.Quaternion().setFromEuler(e.set(t.sum[0], t.sum[1], t.sum[2]));
+        t.undo.copy(q).invert();
+        t.bone.quaternion.multiply(q);
+      });
+
       const walkBob = !mixer || legsWalk;
       const gait = walkBob ? Math.abs(Math.sin(bob)) * 0.04 * k : 0;
       const s = st.squash;
       holder.scale.set(1 / Math.sqrt(s), s, 1 / Math.sqrt(s));
-      const sitLift = actions.sit ? 0 : st.sitT;
+      // Without a sit clip or sit pose, sitting just tilts the whole model back.
+      const sitLift = actions.sit || sitPose ? 0 : st.sitT;
+      const poseLift = sitPose ? poses.sit.lift * st.sitT : 0;
       holder.rotation.x = -0.35 * sitLift + (mixer ? 0 : (st.air ? -0.25 * Math.sign(st.vy) : Math.sin(bob * 2) * 0.04 * k)) + (legsWalk ? -0.12 * airPose * Math.sign(st.vy) : 0);
-      holder.position.set(0, gait - 0.05 * sitLift, -0.08 * sitLift);
+      holder.position.set(0, gait - 0.05 * sitLift + poseLift, -0.08 * sitLift);
       holder.rotation.z = mixer ? 0 : Math.sin(bob) * 0.05 * k;
     }
   };

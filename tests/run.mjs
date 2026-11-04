@@ -37,6 +37,7 @@ async function test(file, ...args) {
 // The play-throughs run with the cat model loaded, which also checks it does not break physics.
 await test('full-run.mjs', '', '', '/tmp');
 await test('garden-attic.mjs', '', '', '/tmp');
+await test('sewing.mjs');
 await test('model.mjs');
 
 process.kill(-server.pid);

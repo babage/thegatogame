@@ -1,6 +1,6 @@
 # The Gato Game
 
-A cosy two-player co-op browser game. Two cats share a dream: three puzzle rooms picked from five, each needing both cats. Bring yarn home and spend it on coats and hats.
+A cosy two-player co-op browser game. Two cats share a dream: three puzzle rooms picked from six, each needing both cats. Bring yarn home and spend it on coats and hats.
 
 ## Play locally
 
@@ -30,6 +30,7 @@ Esc or Start pauses, R or Back restarts the room, M toggles the music. One pad p
 | Bedroom | A plate raises the laundry lift; the cat on top flips a switch that pulls out drawer stairs. |
 | Moonlit garden | Stepping stones only show while a cat stands in a moonbeam. |
 | Attic | The trunk only moves when both cats push from the same side. |
+| Sewing room | The cats share one strand of yarn that only stretches so far. Wind it around all three thread spools. |
 
 ## Project layout
 

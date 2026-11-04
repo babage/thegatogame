@@ -38,7 +38,7 @@ Esc or Start pauses, R or Back restarts the room, M toggles the music. One pad p
 - `src/cats.js` and `src/catModel.js`: the placeholder cats, hats and the GLB cat loader.
 - `src/physics.js`: box collisions, ledge assist, riding on the other cat.
 - `src/input.js`, `src/audio.js`, `src/save.js`, `src/scene.js`, `src/core.js`: input, sound and music, the save file, renderer and shared state.
-- `public/models/`: drop a `cat.glb` here to replace the placeholder cats (see the README there).
+- `public/models/cat.glb`: the cat model, "Bicolor Cat" by kenchoo (CC BY 4.0, see `CREDITS.md`). Its settings are in `src/modelConfig.js`. Swap in another GLB to change the cat (see the README there).
 
 ## Checks
 

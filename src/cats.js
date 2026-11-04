@@ -76,7 +76,7 @@ function dressCats() {
   cats.forEach((c, i) => {
     const w = save.wear[i], coat = COATS.find(x => x.id === w.coat) || COATS[i];
     c.parts.coatM.color.set(coat.coat); c.parts.bellyM.color.set(coat.belly);
-    if (c.model) c.model.setCoat(coat.coat);
+    if (c.model) c.model.setCoat(coat.coat, coat.id);
     if (c.parts.hat) { c.parts.hat.removeFromParent(); c.parts.hat = null; }
     if (w.hat && w.hat !== 'none') { c.parts.hat = makeHat(w.hat); (c.model ? c.model.hatAnchor : c.parts.head).add(c.parts.hat); }
   });

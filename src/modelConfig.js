@@ -1,7 +1,8 @@
 // Settings for the cat model in public/models/cat.glb.
 // Current model: "Bicolor Cat" by kenchoo, CC BY 4.0 (see CREDITS.md).
 export const MODEL = {
-  url: 'models/cat.glb',
+  // VITE_CAT_URL at build time overrides this, for hosts that need another file name.
+  url: import.meta.env.VITE_CAT_URL || 'models/cat.glb',
   // Turn the model if it faces the wrong way (the game expects it to face +z).
   yawDegrees: 0,
   // Multiplies the nose-to-tail size the game fits the model to.

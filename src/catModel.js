@@ -59,12 +59,19 @@ function addCoatSwap(material, swap) {
   material.userData.coatSwap = uniforms;
 }
 
+// A URL ending in .b64.txt holds the GLB as base64 text, for hosts that won't serve .glb files.
 let cached = null;
 export function loadCatModel(url) {
   if (!cached) {
-    cached = new Promise((resolve, reject) => {
-      new GLTFLoader().load(url, resolve, undefined, reject);
-    });
+    const loader = new GLTFLoader();
+    cached = url.endsWith('.b64.txt')
+      ? fetch(url).then(r => r.text()).then(text => {
+        const bin = atob(text.trim());
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return new Promise((resolve, reject) => loader.parse(bytes.buffer, '', resolve, reject));
+      })
+      : new Promise((resolve, reject) => loader.load(url, resolve, undefined, reject));
   }
   return cached;
 }

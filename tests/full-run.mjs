@@ -63,11 +63,18 @@ const W = 640, Hh = 400;
   await page.waitForTimeout(300);
   console.log('state', await G(() => window.__gato.state));
   await G(() => { window.__gato.save.bank = 12; });
-  await page.click('#opt-0-coat-tuxedo'); await page.waitForTimeout(100);
-  await page.click('#opt-1-hat-party'); await page.waitForTimeout(100);
-  await page.click('#opt-0-hat-party'); await page.waitForTimeout(100);
+  // shopping happens by walking: stand on a cushion or mat, paw to buy
+  const stand = (i, id) => page.evaluate(([i, id]) => { const s = window.__gato.level.stations.find(s => s.item.id === id); const c = window.__gato.cats[i]; Object.assign(c.pos, { x: s.x, y: 0, z: s.z }); c.vel.x = c.vel.z = 0; }, [i, id]);
+  await stand(0, 'tuxedo'); await page.waitForTimeout(400); await page.keyboard.press('KeyE'); await page.waitForTimeout(300);
+  await stand(1, 'party'); await page.waitForTimeout(400); await page.keyboard.press('Slash'); await page.waitForTimeout(300);
+  await stand(0, 'party'); await page.waitForTimeout(600);
+  await stand(1, 'beanie'); await page.waitForTimeout(400);
+  console.log('objective on a locked hat', await G(() => document.getElementById('objective').textContent));
   console.log('after buys', JSON.stringify(await G(() => window.__gato.save)));
   await page.screenshot({ path: path.join(dir, 's_hub.png') });
+  // both cats curl up in the dream basket to start the next dream
+  await G(() => { const B = window.__gato.level.basket; Object.assign(window.__gato.cats[0].pos, { x: B.x - 0.5, y: 0, z: B.z }); Object.assign(window.__gato.cats[1].pos, { x: B.x + 0.5, y: 0, z: B.z }); });
+  console.log('basket starts a dream', await waitFor(() => window.__gato.state === 'play' && window.__gato.level.key !== 'home', 12000), await G(() => window.__gato.level.key));
   await page.reload(); await page.waitForTimeout(800);
   console.log('after reload bank', await G(() => window.__gato.save.bank), JSON.stringify(await G(() => window.__gato.save.wear)));
   await page.keyboard.press('KeyX');

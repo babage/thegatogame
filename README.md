@@ -2,6 +2,8 @@
 
 A cosy two-player co-op browser game. Two cats share a dream: three puzzle rooms picked from six, each needing both cats. Bring yarn home and spend it on coats and hats.
 
+Home is a little flat the cats walk around, not a menu: step on a coat cushion or a hat mat to try it on, paw to buy it with yarn from the jar, and curl up in the dream basket together to start a dream. Every finished dream hangs a new picture on the wall.
+
 ## Play locally
 
 ```bash
@@ -34,7 +36,8 @@ Esc or Start pauses, R or Back restarts the room, M toggles the music. One pad p
 
 ## Project layout
 
-- `src/main.js`: game states, menus, the home shop, runs, the frame loop and camera.
+- `src/main.js`: game states, menus, runs, the frame loop and camera.
+- `src/levels/home.js`: the walkable home: coat cushions, hat mats, yarn jar, memory wall and dream basket.
 - `src/levels/`: one file per room, plus shared building helpers.
 - `src/cats.js` and `src/catModel.js`: the placeholder cats, hats and the GLB cat loader.
 - `src/physics.js`: box collisions, ledge assist, riding on the other cat.

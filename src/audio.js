@@ -60,7 +60,7 @@ function toggleMusic() {
   startMusic();
   if (music.bus && actx) { music.bus.gain.cancelScheduledValues(actx.currentTime); music.bus.gain.setTargetAtTime(music.on ? 0.8 : 0.0001, actx.currentTime, 0.3); }
   const label = 'Music: ' + (music.on ? 'on' : 'off');
-  $('pauseMusic').textContent = label; $('hubMusic').textContent = label;
+  $('pauseMusic').textContent = label;
 }
 
 export { actx, audio, blip, meowSound, music, CHORDS, MELODY, hz, tone, musicStep, startMusic, toggleMusic };

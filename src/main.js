@@ -1,14 +1,15 @@
 import './style.css';
 import { GAME_KEYS, NAV_NEXT, NAV_PREV, down, pollPads, pressed, readInputs } from './input.js';
 import { audio, blip, meowSound, music, startMusic, toggleMusic } from './audio.js';
-import { $, blessOverlay, canvas, chipsEl, hubOverlay, napOverlay, objectiveEl, reduceMotion, roomLabel, titleOverlay, yarnEl } from './dom.js';
-import { BLESSINGS, COATS, HATS, persist, save } from './save.js';
+import { $, blessOverlay, canvas, chipsEl, napOverlay, objectiveEl, reduceMotion, roomLabel, titleOverlay, yarnEl, yarnLabel } from './dom.js';
+import { BLESSINGS, persist, save } from './save.js';
 import { G, JUMP_V, R, SPEED, advanceTime, cats, mods, setLevel } from './core.js';
 import { attachModel, dressCats, resetCat } from './cats.js';
 import { loadCatModel, modelAvailable } from './catModel.js';
 import { MODEL } from './modelConfig.js';
 import { disposeLevel } from './levels/helpers.js';
 import { ROOMS, updatePush } from './levels/index.js';
+import { buildHome } from './levels/home.js';
 import { CAM_DIR, M, camTarget, camera, hemi, renderer, scene, sun } from './scene.js';
 import { moveAxis, solidsFor } from './physics.js';
 import * as THREE from 'three';
@@ -28,78 +29,50 @@ function menuNav(d) { if (!menu || !menu.buttons.length) return; const cur = men
 function menuActivate() { if (!menu) return; const cur = menu.buttons.indexOf(document.activeElement); if (cur >= 0) menu.idx = cur; const b = menu.buttons[menu.idx]; if (b) b.click(); }
 
 
-// ---------- Home hub ----------
-const hubGrid = $('hubGrid');
-function ballCost(n) { return '<span class="cost"><span class="ball"></span>' + n + '</span>'; }
-function renderHub(keepId) {
-  $('bank').textContent = save.bank;
-  hubGrid.innerHTML = '';
-  cats.forEach((c, i) => {
-    const col = document.createElement('div'); col.className = 'hub-col';
-    col.innerHTML = '<h3><span class="dot" style="background: var(--p' + (i + 1) + ')"></span>' + c.name + '</h3>';
-    const section = (label, list, kind) => {
-      const l = document.createElement('div'); l.className = 'label'; l.textContent = label; col.appendChild(l);
-      const row = document.createElement('div'); row.className = 'opts'; col.appendChild(row);
-      list.forEach(item => {
-        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.id = 'opt-' + i + '-' + kind + '-' + item.id;
-        const owned = save.owned.includes(item.id), wearing = save.wear[i][kind] === item.id;
-        const sw = kind === 'coat' ? '<span class="swatch" style="background:' + item.coat + '"></span>' : '';
-        b.innerHTML = sw + item.name + (owned ? '' : ' ' + ballCost(item.cost));
-        if (wearing) { b.classList.add('on'); b.setAttribute('aria-pressed', 'true'); }
-        if (!owned && save.bank < item.cost) b.classList.add('locked');
-        b.addEventListener('click', () => {
-          if (!save.owned.includes(item.id)) {
-            if (save.bank < item.cost) { b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); blip([220, 180], 0.15, 'square', 0.04); return; }
-            save.bank -= item.cost; save.owned.push(item.id); blip([660, 990, 1320], 0.3, 'sine', 0.08);
-          } else blip([700, 760], 0.08, 'sine', 0.04);
-          save.wear[i][kind] = item.id; persist(); dressCats(); renderHub(b.id);
-        });
-        row.appendChild(b);
-      });
-    };
-    section('Coat', COATS, 'coat'); section('Hat', HATS, 'hat');
-    hubGrid.appendChild(col);
-  });
-  const buttons = Array.from(hubOverlay.querySelectorAll('button'));
-  const idx = keepId ? buttons.findIndex(b => b.id === keepId) : buttons.indexOf($('startRun'));
-  if (menu && menu.el === hubOverlay) { menu.buttons = buttons; menu.idx = Math.max(0, idx); menuFocus(); }
-  return idx;
-}
+// ---------- Home ----------
+const dreamFade = document.createElement('div'); dreamFade.className = 'dream-fade'; document.body.appendChild(dreamFade);
+// Home is a room the cats walk around: coats, hats and the dream basket are all in it.
 function openHub() {
   titleOverlay.hidden = true; napOverlay.hidden = true; blessOverlay.hidden = true;
-  state = 'hub'; audio(); startMusic(); $('hubMusic').textContent = 'Music: ' + (music.on ? 'on' : 'off'); run = null; mods.jump = mods.speed = mods.magnet = mods.yarnMul = 1; renderChips();
-  if (!level) loadLevel('living');
-  $('hubNote').textContent = save.dreams ? 'Dreams finished: ' + save.dreams + '. Yarn stays here between dreams, and unlocks are shared by both cats.' : 'Yarn you bring home stays here between dreams. Unlocks are shared by both cats.';
+  closeMenu();
+  audio(); startMusic(); run = null; mods.jump = mods.speed = mods.magnet = mods.yarnMul = 1; renderChips();
+  loadLevel('home');
+  level.onDream = () => {
+    // fade into the dream: the screen dims, the first room loads underneath, then it lifts
+    blip([392, 523, 659, 784], 1.2, 'sine', 0.07);
+    state = 'dreaming'; dreamFade.classList.add('on');
+    setTimeout(() => { startRun(); dreamFade.classList.remove('on'); }, reduceMotion ? 0 : 700);
+  };
+  level.say = say;
   roomLabel.textContent = 'Home';
-  objectiveEl.textContent = 'Dress up your cats, then start a dream.';
-  const idx = renderHub();
-  openMenu(hubOverlay, idx);
+  state = 'home';
 }
-$('startRun').addEventListener('click', () => { closeMenu(); startRun(); });
 $('goHome').addEventListener('click', () => { closeMenu(); openHub(); });
 
 
 // ---------- Pause ----------
+let pausedFrom = 'play';
 function openPause() {
-  state = 'pause';
+  pausedFrom = state; state = 'pause';
+  const atHome = pausedFrom === 'home';
+  $('pauseRestart').hidden = atHome; $('pauseHome').hidden = atHome;
   $('pauseEyebrow').textContent = 'Paused · ' + (level ? level.name : '');
   $('pauseMusic').textContent = 'Music: ' + (music.on ? 'on' : 'off');
   openMenu($('pauseOverlay'), 0);
 }
-function resume() { closeMenu(); state = 'play'; }
+function resume() { closeMenu(); state = pausedFrom; }
 $('resume').addEventListener('click', resume);
 $('pauseRestart').addEventListener('click', () => { closeMenu(); restartRoom(); });
 $('pauseHome').addEventListener('click', () => { closeMenu(); openHub(); });
 $('pauseMusic').addEventListener('click', () => { toggleMusic(); });
-$('hubMusic').addEventListener('click', () => { toggleMusic(); });
 
 
 // ---------- Run ----------
 let run = null, roomYarn = 0;
 const shuffle = a => { const r = a.slice(); for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [r[i], r[j]] = [r[j], r[i]]; } return r; };
 function loadLevel(key) {
-  if (level) disposeLevel(level);
-  setLevel(ROOMS[key]());
+  if (level) { if (level.cleanup) level.cleanup(); disposeLevel(level); }
+  setLevel(key === 'home' ? buildHome() : ROOMS[key]());
   const env = level.env;
   scene.background.set(env.bg); hemi.color.set(env.hemi); hemi.groundColor.set(env.ground); hemi.intensity = env.hemiI;
   sun.color.set(env.sun); sun.intensity = env.sunI;
@@ -174,7 +147,7 @@ function purr() {
 }
 function updateCuddle(dt) {
   const [a, b] = cats;
-  const snug = state === 'play' && a.sitting && b.sitting && Math.hypot(a.pos.x - b.pos.x, a.pos.z - b.pos.z) < 1.3 && Math.abs(a.pos.y - b.pos.y) < 0.2;
+  const snug = (state === 'play' || state === 'home') && a.sitting && b.sitting && Math.hypot(a.pos.x - b.pos.x, a.pos.z - b.pos.z) < 1.3 && Math.abs(a.pos.y - b.pos.y) < 0.2;
   if (!snug) { cuddleT = 0; return; }
   cuddleT += dt;
   if (cuddleT > 0.8) {
@@ -247,9 +220,11 @@ function updateWorld(dt) {
       if (dx * dx + dy * dy + dz * dz < reach * reach) { y.got = true; roomYarn += mods.yarnMul; blip([660, 990, 1320], 0.22, 'sine', 0.08); break; }
     }
   });
-  yarnEl.textContent = String(run ? run.yarn + roomYarn : 0);
+  yarnEl.textContent = String(state === 'home' || (state === 'pause' && !run) ? save.bank : run ? run.yarn + roomYarn : 0);
+  yarnLabel.textContent = run ? 'this dream' : 'in the jar';
   if (level.visual) level.visual();
   if (level.goal) level.goal.mesh.material.opacity = 0.22 + 0.13 * Math.sin(time * 2.5);
+  if (state === 'home') { const o = level.objective(); if (objectiveEl.textContent !== o) objectiveEl.textContent = o; return; }
   if (state !== 'play') return;
   const both = cats.every(inGoal);
   let obj = level.objective();
@@ -271,7 +246,7 @@ function animateCat(c, dt) {
   const speed = Math.hypot(c.vel.x, c.vel.z), sMax = SPEED * mods.speed;
   c.walk += speed * dt * 3.4;
   c.squash += (1 - c.squash) * Math.min(1, dt * 10);
-  const forceSit = state !== 'play' ? 1 : 0;
+  const forceSit = (state !== 'play' && state !== 'home') || (level && level.curl && level.curl(c)) ? 1 : 0;
   c.sitT += ((c.sitting || forceSit ? 1 : 0) - c.sitT) * Math.min(1, dt * 12);
   const s = c.squash; p.body.scale.set(1 / Math.sqrt(s), s, 1 / Math.sqrt(s));
   const air = !c.grounded;
@@ -302,7 +277,10 @@ function updateCamera(dt, snap) {
   const mid = new THREE.Vector3((a.x + b.x) / 2, (a.y + b.y) / 4, (a.z + b.z) / 2);
   const spread = Math.hypot(a.x - b.x, a.z - b.z);
   const aspect = window.innerWidth / Math.max(1, window.innerHeight);
-  const want = Math.min(12, Math.max(5.2, spread * 0.5 + 3.4)) * Math.max(1, 1.25 / aspect);
+  let want = Math.min(12, Math.max(5.2, spread * 0.5 + 3.4)) * Math.max(1, 1.25 / aspect);
+  // a room can ask to keep more of itself in view (home shows its whole floor)
+  const view = level && level.view;
+  if (view) { mid.x += (view.x - mid.x) * view.pull; mid.z += (view.z - mid.z) * view.pull; want = Math.max(want, view.size * Math.max(1, 1.25 / aspect)); }
   const k = snap ? 1 : Math.min(1, dt * 3);
   camTarget.lerp(mid, k); camSize += (want - camSize) * k;
   camera.left = -camSize * aspect; camera.right = camSize * aspect; camera.top = camSize; camera.bottom = -camSize;
@@ -327,7 +305,7 @@ function updateBubbles(dt) {
 window.addEventListener('keydown', e => {
   if (state === 'title') { e.preventDefault(); openHub(); return; }
   if (e.code === 'KeyM' && !e.repeat) { toggleMusic(); return; }
-  if (e.code === 'Escape') { e.preventDefault(); if (state === 'play') openPause(); else if (state === 'pause') resume(); return; }
+  if (e.code === 'Escape') { e.preventDefault(); if (state === 'play' || state === 'home') openPause(); else if (state === 'pause') resume(); return; }
   if (menu) {
     if (e.code === 'Enter' || e.code === 'Space' || e.code === 'NumpadEnter') { menuFocus(); return; }
     if (GAME_KEYS.has(e.code)) e.preventDefault();
@@ -344,7 +322,7 @@ titleOverlay.addEventListener('click', () => openHub());
 
 // ---------- Loop ----------
 dressCats();
-loadLevel('living');
+loadLevel('home');
 if (!new URLSearchParams(location.search).has('placeholder')) {
   modelAvailable(MODEL.url).then(ok => ok && loadCatModel(MODEL.url)).then(gltf => {
     if (!gltf) return;
@@ -364,8 +342,8 @@ function frame(now) {
     else for (const p of polled) { if (p.nav) menuNav(p.nav); if (p.accept) { menuActivate(); break; } }
   }
   const inputs = readInputs(polled);
-  const playing = state === 'play' && !menuActed;
-  if (playing && inputs.some(i => i.restart)) restartRoom();
+  const playing = (state === 'play' || state === 'home') && !menuActed;
+  if (playing && state === 'play' && inputs.some(i => i.restart)) restartRoom();
   if (playing && inputs.some(i => i.pause)) openPause();
   const steps = dt > 1 / 60 ? 2 : 1, h = dt / steps;
   for (let s = 0; s < steps; s++) {

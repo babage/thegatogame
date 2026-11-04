@@ -33,21 +33,23 @@ export const MODEL = {
   // On this rig, legs swing forward on +x, the root tips nose-down on +z, the neck and head
   // tip nose-down on +x, and the tail sways on x and lifts on +z. `lift` lowers the body, in the model's own units.
   poses: {
+    // A low sit: hips drop, hind legs fold under with the paws flat, front legs stay straight.
+    // Tuned so no part of the mesh goes below the floor at any point of the idle clip.
     sit: {
-      lift: -0.125,
+      lift: -0.066,
       bones: {
-        Wolf_ROOTSHJnt_38: [0, 0, -0.45],
-        Wolf_Neck_01SHJnt_16: [0.35, 0, 0],
-        Wolf_l_FrontLeg_HipSHJnt_4: [-0.45, 0, 0],
-        Wolf_r_FrontLeg_HipSHJnt_10: [-0.45, 0, 0],
+        Wolf_ROOTSHJnt_38: [0, 0, -0.3],
+        Wolf_Neck_01SHJnt_16: [0.25, 0, 0],
+        Wolf_l_FrontLeg_KneeSHJnt_3: [-0.3, 0, 0],
+        Wolf_r_FrontLeg_KneeSHJnt_9: [-0.3, 0, 0],
         Wolf_l_HindLeg_HipSHJnt_27: [1.2, 0, 0],
         Wolf_r_HindLeg_HipSHJnt_33: [1.2, 0, 0],
-        Wolf_l_HindLeg_Knee1SHJnt_26: [-1.5, 0, 0],
-        Wolf_r_HindLeg_Knee1SHJnt_32: [-1.5, 0, 0],
-        Wolf_l_HindLeg_Knee2SHJnt_25: [0.7, 0, 0],
-        Wolf_r_HindLeg_Knee2SHJnt_31: [0.7, 0, 0],
-        Wolf_Tail_01_02SHJnt_37: [0.5, 0, 0.5],
-        Wolf_Tail_01_03SHJnt_36: [0.5, 0, 0.4]
+        Wolf_l_HindLeg_Knee1SHJnt_26: [-1.6, 0, 0],
+        Wolf_r_HindLeg_Knee1SHJnt_32: [-1.6, 0, 0],
+        Wolf_l_HindLeg_Knee2SHJnt_25: [0.3, 0, 0],
+        Wolf_r_HindLeg_Knee2SHJnt_31: [0.3, 0, 0],
+        Wolf_Tail_01_02SHJnt_37: [0.6, 0, 0.3],
+        Wolf_Tail_01_03SHJnt_36: [0.5, 0, 0.2]
       }
     },
     // A batting swipe with the right front paw.

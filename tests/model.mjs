@@ -14,6 +14,22 @@ if (ok) {
   await p.evaluate(() => window.__gato.startRun(['living', 'kitchen', 'bedroom']));
   await p.keyboard.down('KeyD'); await p.waitForTimeout(800); await p.keyboard.up('KeyD');
   console.log('clips', await p.evaluate(() => window.__gato.cats[0].model.clipNames.join(',')));
+  // Sitting must not push any of the body mesh through the floor.
+  await p.keyboard.down('ShiftLeft'); await p.waitForTimeout(1500);
+  const lowest = await p.evaluate(() => {
+    const c = window.__gato.cats[0];
+    let min = Infinity;
+    c.model.object.traverse(o => {
+      if (!o.isSkinnedMesh || o.geometry.attributes.position.count < 1000) return;
+      const v = o.position.clone(), pos = o.geometry.attributes.position;
+      o.skeleton.update();
+      for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i); o.boneTransform(i, v); v.applyMatrix4(o.matrixWorld); min = Math.min(min, v.y); }
+    });
+    return { sitT: c.sitT, below: min - c.pos.y };
+  });
+  await p.keyboard.up('ShiftLeft');
+  console.log('sitting, lowest point above floor', lowest.below.toFixed(3), 'sitT', lowest.sitT.toFixed(2));
+  if (lowest.sitT > 0.9 && lowest.below < -0.02) errors.push('sit pose goes through the floor by ' + (-lowest.below).toFixed(3));
 }
 console.log('errors', JSON.stringify(errors));
 await b.close();
